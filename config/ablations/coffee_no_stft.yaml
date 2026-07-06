@@ -1,0 +1,7 @@
+base: ../default.yaml
+experiment:
+  name: ablation_no_stft
+  dataset: Coffee
+  representations: [GAF, MTF, RP]
+project:
+  seed: 42

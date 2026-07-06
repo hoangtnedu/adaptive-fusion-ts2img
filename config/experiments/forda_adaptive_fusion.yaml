@@ -1,0 +1,7 @@
+base: ../default.yaml
+experiment:
+  name: adaptive_fusion_full
+  dataset: FordA
+  representations: [GAF, MTF, RP, STFT]
+project:
+  seed: 42

@@ -1,0 +1,7 @@
+base: ../default.yaml
+experiment:
+  name: single_rp
+  dataset: Coffee
+  representations: [RP]
+project:
+  seed: 42

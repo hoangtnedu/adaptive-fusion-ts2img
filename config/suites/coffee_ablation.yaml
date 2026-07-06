@@ -1,0 +1,12 @@
+# Run this with:
+# python -m src.cli.batch_run --suite config/suites/coffee_ablation.yaml
+configs:
+  - ../experiments/coffee_adaptive_fusion.yaml
+  - ../ablations/coffee_no_gaf.yaml
+  - ../ablations/coffee_no_mtf.yaml
+  - ../ablations/coffee_no_rp.yaml
+  - ../ablations/coffee_no_stft.yaml
+  - ../experiments/coffee_single_gaf.yaml
+  - ../experiments/coffee_single_mtf.yaml
+  - ../experiments/coffee_single_rp.yaml
+  - ../experiments/coffee_single_stft.yaml

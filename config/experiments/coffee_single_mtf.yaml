@@ -1,0 +1,7 @@
+base: ../default.yaml
+experiment:
+  name: single_mtf
+  dataset: Coffee
+  representations: [MTF]
+project:
+  seed: 42

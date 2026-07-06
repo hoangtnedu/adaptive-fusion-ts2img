@@ -1,0 +1,51 @@
+base_config: ../default.yaml
+description: 'Stage 3 extension: 30 datasets x 3 seeds for proposed adaptive model
+  only.'
+datasets:
+- Coffee
+- ECG200
+- GunPoint
+- FordA
+- Wafer
+- ItalyPowerDemand
+- Trace
+- TwoLeadECG
+- CBF
+- Beef
+- Meat
+- OliveOil
+- Lightning2
+- Lightning7
+- MoteStrain
+- SonyAIBORobotSurface1
+- SonyAIBORobotSurface2
+- Plane
+- FaceFour
+- Ham
+- Car
+- Fish
+- SwedishLeaf
+- Symbols
+- Yoga
+- MedicalImages
+- ProximalPhalanxOutlineCorrect
+- DistalPhalanxOutlineCorrect
+- MiddlePhalanxOutlineCorrect
+- PhalangesOutlinesCorrect
+seeds:
+- 42
+- 43
+- 44
+methods:
+- name: adaptive_fusion_full
+  override:
+    experiment:
+      name: adaptive_fusion_full
+      representations:
+      - GAF
+      - MTF
+      - RP
+      - STFT
+    model:
+      name: AdaptiveFusionCNN
+      fusion: adaptive_gating

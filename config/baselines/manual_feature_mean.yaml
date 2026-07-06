@@ -1,0 +1,12 @@
+base: ../default.yaml
+
+experiment:
+  name: manual_feature_mean
+  dataset: Coffee
+  representations: [GAF, MTF, RP, STFT]
+
+model:
+  name: AdaptiveFusionCNN
+  fusion: feature_mean
+  feature_dim: 128
+  dropout: 0.3

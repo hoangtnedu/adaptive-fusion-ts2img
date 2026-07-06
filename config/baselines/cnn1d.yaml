@@ -1,0 +1,17 @@
+base: ../default.yaml
+
+experiment:
+  name: cnn1d
+  dataset: Coffee
+  run_name_template: "{dataset}_{experiment}_seed{seed}"
+
+data:
+  input_mode: raw_1d
+
+model:
+  name: CNN1D
+  hidden_channels: [32, 64]
+  dropout: 0.3
+
+evaluation:
+  save_alpha: false

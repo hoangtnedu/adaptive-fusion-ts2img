@@ -1,0 +1,71 @@
+base_config: ../default.yaml
+description: 'Stage 4: strong Q1/Q2-scale proposed-method run. Add all methods only
+  if compute resources allow.'
+datasets:
+- Coffee
+- ECG200
+- GunPoint
+- FordA
+- Wafer
+- ItalyPowerDemand
+- Trace
+- TwoLeadECG
+- CBF
+- Beef
+- Meat
+- OliveOil
+- Lightning2
+- Lightning7
+- MoteStrain
+- SonyAIBORobotSurface1
+- SonyAIBORobotSurface2
+- Plane
+- FaceFour
+- Ham
+- Car
+- Fish
+- SwedishLeaf
+- Symbols
+- Yoga
+- MedicalImages
+- ProximalPhalanxOutlineCorrect
+- DistalPhalanxOutlineCorrect
+- MiddlePhalanxOutlineCorrect
+- PhalangesOutlinesCorrect
+- Adiac
+- ArrowHead
+- BeetleFly
+- BirdChicken
+- ChlorineConcentration
+- DiatomSizeReduction
+- Earthquakes
+- ECG5000
+- FaceAll
+- FacesUCR
+- FiftyWords
+- Haptics
+- InlineSkate
+- LargeKitchenAppliances
+- Mallat
+- OSULeaf
+- SyntheticControl
+- ToeSegmentation1
+- ToeSegmentation2
+- WordSynonyms
+seeds:
+- 42
+- 43
+- 44
+methods:
+- name: adaptive_fusion_full
+  override:
+    experiment:
+      name: adaptive_fusion_full
+      representations:
+      - GAF
+      - MTF
+      - RP
+      - STFT
+    model:
+      name: AdaptiveFusionCNN
+      fusion: adaptive_gating

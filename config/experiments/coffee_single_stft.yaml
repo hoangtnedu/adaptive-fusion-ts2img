@@ -1,0 +1,7 @@
+base: ../default.yaml
+experiment:
+  name: single_stft
+  dataset: Coffee
+  representations: [STFT]
+project:
+  seed: 42

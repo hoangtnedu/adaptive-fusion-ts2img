@@ -1,0 +1,64 @@
+# This file is a method template for documentation. It is not meant to be
+# passed directly to batch_run because it has no dataset/seed list.
+methods:
+  - name: cnn1d
+    override:
+      experiment:
+        name: cnn1d
+        run_name_template: "{dataset}_{experiment}_seed{seed}"
+      data:
+        input_mode: raw_1d
+      model:
+        name: CNN1D
+        hidden_channels: [32, 64]
+        dropout: 0.3
+      evaluation:
+        save_alpha: false
+  - name: gaf_lightcnn
+    override:
+      experiment:
+        name: gaf_lightcnn
+        representations: [GAF]
+      model:
+        name: AdaptiveFusionCNN
+        fusion: feature_mean
+  - name: mtf_lightcnn
+    override:
+      experiment:
+        name: mtf_lightcnn
+        representations: [MTF]
+      model:
+        name: AdaptiveFusionCNN
+        fusion: feature_mean
+  - name: rp_lightcnn
+    override:
+      experiment:
+        name: rp_lightcnn
+        representations: [RP]
+      model:
+        name: AdaptiveFusionCNN
+        fusion: feature_mean
+  - name: stft_lightcnn
+    override:
+      experiment:
+        name: stft_lightcnn
+        representations: [STFT]
+      model:
+        name: AdaptiveFusionCNN
+        fusion: feature_mean
+  - name: manual_feature_concat
+    override:
+      experiment:
+        name: manual_feature_concat
+        representations: [GAF, MTF, RP, STFT]
+      model:
+        name: AdaptiveFusionCNN
+        fusion: feature_concat
+  - name: adaptive_fusion_full
+    override:
+      experiment:
+        name: adaptive_fusion_full
+        representations: [GAF, MTF, RP, STFT]
+      model:
+        name: AdaptiveFusionCNN
+        fusion: adaptive_gating

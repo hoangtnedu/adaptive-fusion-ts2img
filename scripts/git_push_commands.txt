@@ -1,0 +1,15 @@
+# Chạy trong Terminal tại thư mục adaptive-fusion-ts2img
+
+git init
+git status
+git add .
+git commit -m "Initial adaptive fusion time-series project"
+git branch -M main
+git remote add origin https://github.com/YOUR_USERNAME/adaptive-fusion-ts2img.git
+git push -u origin main
+
+# Các lần cập nhật sau:
+git status
+git add .
+git commit -m "Update adaptive fusion experiment"
+git push

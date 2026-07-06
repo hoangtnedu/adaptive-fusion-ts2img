@@ -1,0 +1,10 @@
+base: ../default.yaml
+
+experiment:
+  name: stft_lightcnn
+  dataset: Coffee
+  representations: [STFT]
+
+model:
+  name: AdaptiveFusionCNN
+  fusion: feature_mean

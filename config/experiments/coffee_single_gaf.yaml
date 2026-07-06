@@ -1,0 +1,7 @@
+base: ../default.yaml
+experiment:
+  name: single_gaf
+  dataset: Coffee
+  representations: [GAF]
+project:
+  seed: 42
