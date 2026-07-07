@@ -19,6 +19,29 @@ def minmax_per_image(images: np.ndarray, eps: float = 1e-8) -> np.ndarray:
     return np.stack(out, axis=0)
 
 
+def resample_series_length(X: np.ndarray, target_length: int) -> np.ndarray:
+    """Resample each 1D series to a fixed length using linear interpolation.
+
+    This is used before Recurrence Plot creation. A standard RP transformer creates
+    an N x T x T tensor, so running it directly on long datasets such as FordA
+    (T=500) can exhaust Colab RAM before the image is resized to 64 x 64. Resampling
+    first makes RP creation memory-safe and keeps the final RP image size aligned
+    with the configured image_size.
+    """
+    target_length = int(target_length)
+    if target_length <= 1:
+        raise ValueError("target_length must be > 1")
+    if X.shape[1] == target_length:
+        return X.astype(np.float32, copy=False)
+
+    old_grid = np.linspace(0.0, 1.0, X.shape[1], dtype=np.float32)
+    new_grid = np.linspace(0.0, 1.0, target_length, dtype=np.float32)
+    out = np.empty((X.shape[0], target_length), dtype=np.float32)
+    for i, x in enumerate(X):
+        out[i] = np.interp(new_grid, old_grid, x).astype(np.float32)
+    return out
+
+
 def make_gaf(
     X: np.ndarray,
     image_size: int = 64,
@@ -58,7 +81,14 @@ def make_rp(
     image_size: int = 64,
     threshold=None,
     percentage: float = 10.0,
+    pre_resample: bool = True,
 ) -> np.ndarray:
+    """Create memory-safe Recurrence Plot images.
+
+    If pre_resample=True, each series is first resampled to image_size and then RP
+    is computed. This avoids constructing very large N x T x T arrays for long
+    UCR datasets and is the recommended Colab-safe setting.
+    """
     from pyts.image import RecurrencePlot
     from skimage.transform import resize
 
@@ -68,8 +98,13 @@ def make_rp(
         kwargs["percentage"] = percentage
 
     transformer = RecurrencePlot(**kwargs)
-    images = transformer.fit_transform(X)
 
+    if pre_resample:
+        X_rp = resample_series_length(X, target_length=image_size)
+        images = transformer.fit_transform(X_rp)
+        return minmax_per_image(images.astype(np.float32, copy=False))
+
+    images = transformer.fit_transform(X)
     resized = []
     for img in images:
         resized_img = resize(
@@ -142,6 +177,7 @@ def _make_one_representation(rep: str, X: np.ndarray, image_size: int, transform
             image_size=image_size,
             threshold=cfg.get("threshold", None),
             percentage=float(cfg.get("percentage", 10.0)),
+            pre_resample=bool(cfg.get("pre_resample", True)),
         )
     if rep == "STFT":
         cfg = transform_cfg.get("stft", {})
