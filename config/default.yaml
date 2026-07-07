@@ -59,6 +59,7 @@ transform:
   rp:
     threshold: null
     percentage: 10.0
+    pre_resample: true
   stft:
     nperseg_max: 32
     noverlap_ratio: 0.5
