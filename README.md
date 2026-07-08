@@ -1,52 +1,105 @@
 # Adaptive Fusion TS2Img
 
-Adaptive Fusion TS2Img là mã nguồn nghiên cứu cho bài toán **phân loại chuỗi thời gian** bằng cách chuyển chuỗi 1D thành nhiều biểu diễn ảnh 2D, sau đó kết hợp các biểu diễn này bằng cơ chế **adaptive gating / attention fusion**.
+[![Research](https://img.shields.io/badge/status-research--prototype-blue)](#)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](#)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.x-orange)](#)
+[![UCR/UEA](https://img.shields.io/badge/Data-UCR%2FUEA-lightgrey)](#)
 
-Pipeline chính:
+**Adaptive Fusion TS2Img** is a research-oriented codebase for **time-series classification** using multiple two-dimensional representations of one-dimensional time series. The project converts a 1D signal into several 2D images, extracts features using lightweight CNN branches, and combines them through an **adaptive gating / attention fusion** mechanism.
+
+This repository is intended for academic experiments, reproducibility, and paper development. It is **not** a production software package and should not be treated as a finalized benchmark implementation.
+
+---
+
+## 1. Research direction
+
+Working topic:
+
+> **A Lightweight Adaptive Fusion Network of Two-Dimensional Representations for Time-Series Classification**
+
+The central idea is that different time-series imaging methods emphasize different signal properties:
+
+| Representation | Main information emphasized | Typical intuition |
+|---|---|---|
+| **GAF / GASF / GADF** | Angular correlation and temporal shape relationship | Useful when global shape and pairwise temporal correlation matter |
+| **MTF** | Markov transition probabilities between discretized signal states | Useful when state transition patterns are informative |
+| **RP** | Recurrence of system states in phase space | Useful for periodic, repetitive, or nonlinear dynamics |
+| **STFT** | Time-frequency energy distribution | Useful for oscillatory, vibration, acoustic, or biomedical signals |
+
+Instead of manually selecting one representation or using fixed fusion, the proposed model learns representation weights adaptively.
+
+---
+
+## 2. Main pipeline
 
 ```text
 1D time series
     -> GAF / MTF / RP / STFT
-    -> lightweight CNN branches
-    -> adaptive gating fusion
+    -> lightweight CNN feature branches
+    -> adaptive gating / attention fusion
     -> classifier
+    -> metrics, complexity, fusion-weight analysis
 ```
 
-Repository được tổ chức theo hướng phục vụ thực nghiệm bài báo: notebook chỉ dùng để gọi lệnh, logic nghiên cứu nằm trong `src/`, tham số thí nghiệm nằm trong các file YAML ở `config/`.
+Optional Mermaid view:
+
+```mermaid
+flowchart LR
+    A[1D time series] --> B1[GAF]
+    A --> B2[MTF]
+    A --> B3[RP]
+    A --> B4[STFT]
+    B1 --> C1[Light CNN branch]
+    B2 --> C2[Light CNN branch]
+    B3 --> C3[Light CNN branch]
+    B4 --> C4[Light CNN branch]
+    C1 --> D[Adaptive gating / attention fusion]
+    C2 --> D
+    C3 --> D
+    C4 --> D
+    D --> E[Classifier]
+    E --> F[Accuracy / Macro-F1 / Params / FLOPs / Inference time]
+```
 
 ---
 
-## 1. Tuyên bố miễn trừ trách nhiệm
+## 3. What this repository is designed to support
 
-Mã nguồn này được cung cấp cho mục đích **nghiên cứu, học thuật và tái lập thực nghiệm**. Tác giả không bảo đảm rằng mã nguồn sẽ chạy thành công trong mọi môi trường hoặc tạo ra kết quả giống hệt trên mọi máy.
+This codebase is organized for a staged research workflow:
 
-Kết quả thực nghiệm có thể khác nhau do nhiều nguyên nhân, bao gồm nhưng không giới hạn ở:
+1. **Smoke testing** on a small number of datasets to verify that data loading, transforms, training, checkpointing, and output generation work.
+2. **Pilot experiments** on a moderate number of datasets to inspect trends and failure cases.
+3. **Paper-grade experiments** on at least 20 datasets with multiple seeds, baselines, statistical tests, and ablation studies.
+4. **Stronger Q1/Q2-scale experiments** on 30--50 datasets, preferably with 5 seeds where computation allows.
 
-- khác biệt về phiên bản Python, PyTorch, CUDA, cuDNN, scikit-learn, pyts hoặc các thư viện phụ thuộc;
-- khác biệt giữa CPU, GPU, RAM, hệ điều hành, Google Colab, máy local hoặc máy chủ tính toán;
-- dữ liệu UCR/UEA không đúng định dạng, thiếu file, sai tên thư mục hoặc sai phân chia train/test;
-- sai khác do seed, thuật toán GPU không hoàn toàn deterministic, batch size, early stopping hoặc checkpoint resume;
-- thay đổi từ nền tảng Google Colab, Google Drive, GitHub hoặc hệ thống lưu trữ bên ngoài;
-- cấu hình thí nghiệm bị chỉnh sửa so với file YAML gốc.
+For a journal-quality paper, do not rely on a single run or only a few datasets. Report at least:
 
-Người sử dụng có trách nhiệm tự kiểm tra môi trường, dữ liệu, đường dẫn, giấy phép sử dụng dữ liệu, phiên bản thư viện và kết quả đầu ra trước khi sử dụng trong bài báo, báo cáo, đồ án hoặc hệ thống thực tế.
-
-Mã nguồn này **không phải phần mềm thương mại**, **không phải hệ thống sản xuất**, và **không đi kèm cam kết hỗ trợ, bảo hành hoặc đảm bảo kết quả công bố**. Nếu người dùng không chạy được hoặc không tái lập được kết quả, cần kiểm tra lại dữ liệu, môi trường, file cấu hình và log lỗi trước khi kết luận về phương pháp.
+- Accuracy and Macro-F1;
+- Precision, recall, and possibly AUC when appropriate;
+- number of trainable parameters;
+- FLOPs;
+- training time;
+- inference time per sample;
+- average rank across datasets;
+- statistical tests such as Friedman and Wilcoxon/Nemenyi;
+- ablation study by removing representation branches;
+- adaptive fusion weights, for example `alpha_GAF`, `alpha_MTF`, `alpha_RP`, `alpha_STFT`.
 
 ---
 
-## 2. Cấu trúc thư mục
+## 4. Repository structure
 
 ```text
 adaptive-fusion-ts2img/
 ├── config/
 │   ├── default.yaml
-│   ├── experiments/      # cấu hình từng thí nghiệm đơn
-│   ├── baselines/        # cấu hình baseline: 1D-CNN, single 2D, manual fusion
-│   ├── ablations/        # cấu hình ablation bỏ từng nhánh biểu diễn
-│   └── suites/           # cấu hình chạy nhiều dataset, seed, method theo từng stage
+│   ├── README.md
+│   ├── experiments/          # single adaptive-fusion experiment configs
+│   ├── baselines/            # 1D-CNN, single 2D, manual fusion configs
+│   ├── ablations/            # configs for removing representation branches
+│   └── suites/               # staged multi-dataset / multi-seed experiment suites
 ├── data/
-│   └── UCR/              # nơi đặt dữ liệu UCR/UEA, không đẩy dữ liệu lên GitHub
+│   └── UCR/                  # local UCR/UEA datasets; do not commit raw datasets
 ├── docs/
 │   └── EXPERIMENT_STAGES.md
 ├── notebooks/
@@ -54,62 +107,70 @@ adaptive-fusion-ts2img/
 │   ├── 02_local_pipeline_commands_only.ipynb
 │   └── README.md
 ├── src/
-│   ├── cli/              # các lệnh chạy, gom kết quả, kiểm định thống kê
-│   ├── data/             # đọc dữ liệu UCR
-│   ├── datasets/         # PyTorch Dataset
-│   ├── models/           # AdaptiveFusionCNN, CNN1D
-│   ├── transforms/       # GAF, MTF, RP, STFT
-│   └── utils/            # config, seed, metric, experiment utilities
-├── outputs/              # kết quả sinh ra, bị ignore bởi git
-├── cache/                # cache ảnh 2D, bị ignore bởi git
+│   ├── cli/                  # batch run, result collection, ranking, statistical tests
+│   ├── data/                 # UCR/UEA reading utilities
+│   ├── datasets/             # PyTorch dataset wrappers
+│   ├── models/               # CNN1D, AdaptiveFusionCNN, lightweight CNN branches
+│   ├── transforms/           # GAF, MTF, RP, STFT transforms
+│   └── utils/                # config, metrics, seed, logging, experiment utilities
+├── outputs/                  # generated run outputs; should not be committed
+├── cache/                    # cached transformed images; should not be committed
+├── results/                  # optional summarized results; keep only lightweight summaries
 ├── scripts/
 │   └── git_push_commands.txt
+├── COLAB_QUICKSTART.md
 ├── requirements.txt
 ├── .gitignore
 └── README.md
 ```
 
----
-
-## 3. Notebook nên dùng
-
-Nếu chạy trên Google Colab, dùng:
-
-```text
-notebooks/01_colab_pipeline_commands_only.ipynb
-```
-
-Nếu chạy trên máy cá nhân bằng Visual Studio Code hoặc Visual Studio, dùng:
-
-```text
-notebooks/02_local_pipeline_commands_only.ipynb
-```
-
-Notebook chỉ nên dùng để gọi lệnh. Không nên đặt logic xử lý dữ liệu, định nghĩa mô hình hoặc train loop trực tiếp trong notebook.
+The project follows a **command-only notebook** policy: notebooks should call CLI commands, while research logic should stay in `src/` and experiment settings should stay in YAML files under `config/`.
 
 ---
 
-## 4. Cài đặt môi trường local
+## 5. Installation
 
-Tạo môi trường ảo:
+### 5.1. Clone the repository
+
+```bash
+git clone https://github.com/hoangtnedu/adaptive-fusion-ts2img.git
+cd adaptive-fusion-ts2img
+```
+
+### 5.2. Create a virtual environment
+
+Windows:
 
 ```bash
 python -m venv .venv
-```
-
-Kích hoạt trên Windows:
-
-```bash
 .venv\Scripts\activate
 ```
 
-Cài thư viện:
+Linux/macOS:
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+### 5.3. Install dependencies
+
+```bash
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Kiểm tra nhanh source code:
+The main dependency groups are:
+
+- numerical/data processing: `numpy`, `pandas`, `scipy`;
+- machine learning and metrics: `scikit-learn`;
+- image processing: `scikit-image`;
+- time-series imaging: `pyts`;
+- deep learning: `torch`, `torchvision`;
+- complexity measurement: `thop`;
+- configuration and plotting: `pyyaml`, `matplotlib`.
+
+### 5.4. Quick source check
 
 ```bash
 python -m compileall src
@@ -117,9 +178,11 @@ python -m compileall src
 
 ---
 
-## 5. Cấu trúc dữ liệu UCR/UEA
+## 6. Dataset preparation
 
-Dữ liệu không được đẩy lên GitHub. Hãy đặt dữ liệu trong thư mục `data/UCR/` theo cấu trúc:
+Raw UCR/UEA datasets are **not included** in this repository. Place datasets locally under `data/UCR/` using the standard train/test split.
+
+Example structure:
 
 ```text
 data/UCR/Coffee/Coffee_TRAIN.tsv
@@ -132,25 +195,49 @@ data/UCR/GunPoint/GunPoint_TRAIN.tsv
 data/UCR/GunPoint/GunPoint_TEST.tsv
 ```
 
-Mỗi file `.tsv` cần có dạng:
+Each `.tsv` file is expected to follow this format:
 
 ```text
 label    value_1    value_2    value_3    ...    value_T
 ```
 
-Trong đó cột đầu là nhãn lớp, các cột còn lại là giá trị chuỗi thời gian.
+The first column is the class label. All remaining columns are time-series values.
+
+Before running large experiments, verify that dataset folder names and file names exactly match the names used in the YAML configuration files.
 
 ---
 
-## 6. Chạy một thí nghiệm đơn
+## 7. Recommended notebooks
 
-Ví dụ chạy mô hình adaptive fusion trên dataset Coffee:
+For Google Colab:
+
+```text
+notebooks/01_colab_pipeline_commands_only.ipynb
+```
+
+For local execution with VS Code, Visual Studio, or terminal:
+
+```text
+notebooks/02_local_pipeline_commands_only.ipynb
+```
+
+For Colab-specific setup, see:
+
+```text
+COLAB_QUICKSTART.md
+```
+
+---
+
+## 8. Running a single experiment
+
+Example: adaptive fusion on Coffee.
 
 ```bash
 python -m src.train --config config/experiments/coffee_adaptive_fusion.yaml
 ```
 
-Chạy các baseline:
+Example baselines:
 
 ```bash
 python -m src.train --config config/baselines/cnn1d.yaml
@@ -159,24 +246,30 @@ python -m src.train --config config/baselines/single_mtf.yaml
 python -m src.train --config config/baselines/single_rp.yaml
 python -m src.train --config config/baselines/single_stft.yaml
 python -m src.train --config config/baselines/manual_feature_concat.yaml
+python -m src.train --config config/baselines/manual_feature_mean.yaml
 ```
+
+Run from the repository root. If `ModuleNotFoundError: src` appears, check that the current directory is `adaptive-fusion-ts2img/`.
 
 ---
 
-## 7. Chạy theo từng giai đoạn thực nghiệm
+## 9. Staged experiment suites
 
-Nên chạy theo thứ tự từ nhỏ đến lớn.
+Run experiments from small to large. Do **not** start paper-grade runs until the smoke and pilot stages work correctly.
 
-### Stage 1 — Smoke test
+| Stage | Purpose | Suite file |
+|---|---|---|
+| Stage 1 | Smoke test on 5 datasets, 3 seeds, all main methods | `config/suites/stage1_smoke_5datasets_3seeds_all_methods.yaml` |
+| Stage 2 | Pilot experiment on 12 datasets, 3 seeds | `config/suites/stage2_pilot_12datasets_3seeds_all_methods.yaml` |
+| Stage 3 | Paper-grade minimum on 20 datasets, 3 seeds | `config/suites/stage3_paper_20datasets_3seeds_all_methods.yaml` |
+| Stage 3 ablation | Ablation on 20 datasets for adaptive model | `config/suites/stage3_ablation_20datasets_3seeds_adaptive.yaml` |
+| Stage 3 adaptive-only | Wider adaptive-only check on 30 datasets | `config/suites/stage3_paper_30datasets_3seeds_adaptive_only.yaml` |
+| Stage 4 | Stronger Q1/Q2-scale run on 30 datasets, 5 seeds | `config/suites/stage4_strong_30datasets_5seeds_all_methods.yaml` |
+| Stage 4 adaptive-only | Large adaptive-only run on 50 datasets, 3 seeds | `config/suites/stage4_strong_50datasets_3seeds_adaptive_only.yaml` |
 
-Mục tiêu: kiểm tra pipeline, dữ liệu, cache, checkpoint và các baseline.
+### 9.1. Dry run
 
-```bash
-python -m src.cli.batch_run \
-  --suite config/suites/stage1_smoke_5datasets_3seeds_all_methods.yaml
-```
-
-Chạy thử lệnh nhưng chưa train thật:
+Use `--dry-run` first to check generated commands without training:
 
 ```bash
 python -m src.cli.batch_run \
@@ -184,28 +277,42 @@ python -m src.cli.batch_run \
   --dry-run
 ```
 
-### Stage 2 — Pilot experiment
+### 9.2. Stage 1 smoke test
+
+```bash
+python -m src.cli.batch_run \
+  --suite config/suites/stage1_smoke_5datasets_3seeds_all_methods.yaml
+```
+
+### 9.3. Stage 2 pilot experiment
 
 ```bash
 python -m src.cli.batch_run \
   --suite config/suites/stage2_pilot_12datasets_3seeds_all_methods.yaml
 ```
 
-### Stage 3 — Paper-grade minimum
+### 9.4. Stage 3 paper-grade minimum
 
 ```bash
 python -m src.cli.batch_run \
   --suite config/suites/stage3_paper_20datasets_3seeds_all_methods.yaml
 ```
 
-### Stage 4 — Stronger Q1/Q2 scale
+### 9.5. Stage 3 ablation
+
+```bash
+python -m src.cli.batch_run \
+  --suite config/suites/stage3_ablation_20datasets_3seeds_adaptive.yaml
+```
+
+### 9.6. Stage 4 stronger Q1/Q2-scale run
 
 ```bash
 python -m src.cli.batch_run \
   --suite config/suites/stage4_strong_30datasets_5seeds_all_methods.yaml
 ```
 
-hoặc chỉ mở rộng mô hình đề xuất trên nhiều dataset:
+or adaptive-only:
 
 ```bash
 python -m src.cli.batch_run \
@@ -214,9 +321,9 @@ python -m src.cli.batch_run \
 
 ---
 
-## 8. Gom kết quả và phân tích
+## 10. Collecting and analyzing results
 
-Gom tất cả kết quả thành một file CSV:
+Collect all run summaries into a single CSV file:
 
 ```bash
 python -m src.cli.collect_results \
@@ -224,7 +331,7 @@ python -m src.cli.collect_results \
   --out-csv outputs/summary_all_runs.csv
 ```
 
-Tính average rank:
+Compute average rank using Macro-F1:
 
 ```bash
 python -m src.cli.rank_results \
@@ -232,7 +339,7 @@ python -m src.cli.rank_results \
   --metric test_macro_f1
 ```
 
-Kiểm định thống kê:
+Run statistical tests:
 
 ```bash
 python -m src.cli.statistical_tests \
@@ -241,7 +348,7 @@ python -m src.cli.statistical_tests \
   --proposed adaptive_fusion_full
 ```
 
-Xuất bảng cho bài báo:
+Export paper-ready tables:
 
 ```bash
 python -m src.cli.export_paper_tables \
@@ -251,55 +358,56 @@ python -m src.cli.export_paper_tables \
 
 ---
 
-## 9. Các file kết quả chính
+## 11. Main output files
 
-Mỗi lần chạy sẽ sinh ra thư mục kết quả trong `outputs/`. Các file quan trọng gồm:
+Each experiment should create an output directory under `outputs/`. Important files may include:
 
 ```text
-summary.json                  # kết quả chính: Accuracy, Macro-F1, Precision, Recall
-config_used.yaml              # cấu hình thực tế đã dùng cho lần chạy
-environment.json              # thông tin môi trường chạy
-best_model.pt                 # checkpoint tốt nhất
-last_checkpoint.pt            # checkpoint để resume
-history.csv                   # log theo epoch
-classification_report.txt     # báo cáo phân loại
-confusion_matrix.png          # ma trận nhầm lẫn
-learning_curve_macro_f1.png   # đường học tập
-complexity.json               # params, FLOPs nếu đo được
-inference_time.json           # thời gian suy luận
-alpha_mean.csv                # trọng số fusion trung bình
-alpha_test_samples.csv        # trọng số fusion theo từng mẫu test
+summary.json                  # Accuracy, Macro-F1, precision, recall, complexity fields
+config_used.yaml              # fully resolved configuration used in the run
+environment.json              # Python, library, hardware, and environment information
+best_model.pt                 # best checkpoint
+last_checkpoint.pt            # latest checkpoint for resume
+history.csv                   # epoch-wise training history
+classification_report.txt     # class-level report
+confusion_matrix.png          # confusion matrix
+learning_curve_macro_f1.png   # learning curve
+complexity.json               # trainable params and FLOPs, if measured
+inference_time.json           # inference time per sample
+alpha_mean.csv                # mean adaptive fusion weights
+alpha_test_samples.csv        # per-sample adaptive fusion weights
 ```
 
-`config_used.yaml` và `environment.json` nên được lưu lại để phục vụ tái lập kết quả khi viết bài báo.
+For reproducibility, always keep `summary.json`, `config_used.yaml`, and `environment.json` for each run used in a paper table.
 
 ---
 
-## 10. Resume khi bị ngắt
+## 12. Resume interrupted training
 
-Nếu quá trình train bị ngắt, chạy lại đúng lệnh cũ:
+If training is interrupted, rerun the same command:
 
 ```bash
 python -m src.train --config config/experiments/coffee_adaptive_fusion.yaml
 ```
 
-Chương trình sẽ kiểm tra `last_checkpoint.pt` trong thư mục output và tiếp tục nếu checkpoint tồn tại.
+The training script should check `last_checkpoint.pt` in the output directory and continue if a valid checkpoint exists.
 
 ---
 
-## 11. Quy tắc GitHub
+## 13. GitHub and storage rules
 
-Repository này chỉ nên lưu:
+Commit only lightweight and reproducible project files:
 
 ```text
 source code
-YAML config
-notebooks command-only
+YAML configuration files
+command-only notebooks
 documentation
 requirements.txt
+small summary tables or lightweight result summaries
 ```
 
-Không nên đẩy lên GitHub:
+Do **not** commit heavy or machine-specific files:
 
 ```text
 data/UCR/*
@@ -308,77 +416,149 @@ cache/*
 *.pt
 *.pth
 *.ckpt
+large generated image caches
+large raw result folders
 ```
 
-Các mục này đã được khai báo trong `.gitignore`.
-
-Lệnh đẩy code lần đầu:
-
-```bash
-git init
-git add .
-git commit -m "Initial adaptive fusion TS2Img project"
-git branch -M main
-git remote add origin https://github.com/<username>/adaptive-fusion-ts2img.git
-git push -u origin main
-```
-
-Các lần cập nhật sau:
+Recommended update workflow:
 
 ```bash
 git status
-git add .
-git commit -m "Update experiment pipeline"
+git add README.md config src notebooks docs requirements.txt
+git commit -m "Update README for adaptive fusion experiment workflow"
 git push
 ```
 
 ---
 
-## 12. Gợi ý xử lý lỗi thường gặp
+## 14. Troubleshooting
 
-Nếu báo thiếu dữ liệu, kiểm tra:
+### Missing dataset files
+
+Check the exact path:
 
 ```text
 data/UCR/<DatasetName>/<DatasetName>_TRAIN.tsv
 data/UCR/<DatasetName>/<DatasetName>_TEST.tsv
 ```
 
-Nếu Colab chạy chậm, nên đảm bảo code nằm ở `/content`, còn Google Drive chỉ dùng để lưu `outputs/` và `cache/`.
+Dataset names are case-sensitive on Linux and Google Colab.
 
-Nếu lỗi import module `src`, hãy chạy lệnh từ thư mục gốc của project:
+### Import error for `src`
+
+Run commands from the repository root:
 
 ```bash
 cd adaptive-fusion-ts2img
 python -m src.train --config config/experiments/coffee_adaptive_fusion.yaml
 ```
 
-Nếu kết quả khác với lần chạy trước, kiểm tra:
+### Colab runs slowly
+
+For Colab, a practical pattern is:
+
+```text
+/content/adaptive-fusion-ts2img/     # source code
+/content/drive/MyDrive/.../outputs/  # persistent outputs
+/content/drive/MyDrive/.../cache/    # optional cache
+```
+
+Keeping source code under `/content` is usually faster than running everything directly from Google Drive.
+
+### Results differ between runs
+
+Check:
 
 ```text
 seed
 config_used.yaml
-phiên bản thư viện
-GPU/CPU
-checkpoint resume
-dữ liệu train/test
+Python and library versions
+CPU/GPU device
+CUDA/cuDNN behavior
+batch size
+early stopping
+checkpoint resume behavior
+train/test split
+image transform parameters
 ```
+
+Small differences are expected across hardware and software environments, especially when GPU kernels are not fully deterministic.
+
+### Very low Macro-F1
+
+Inspect:
+
+```text
+class imbalance
+label encoding
+train/validation split
+normalization method
+learning curves
+confusion matrix
+early stopping epoch
+whether the selected representation is suitable for the dataset
+```
+
+Accuracy alone can be misleading on imbalanced datasets. Macro-F1 should be examined carefully.
 
 ---
 
-## 13. Trích dẫn và sử dụng trong bài báo
+## 15. Reproducibility checklist for paper use
 
-Khi sử dụng mã nguồn này cho bài báo hoặc báo cáo, cần mô tả rõ:
+Before using results from this repository in a manuscript, record:
+
+- dataset names and domains;
+- original train/test split source;
+- number of classes, train size, test size, and time-series length;
+- transform configuration for GAF, MTF, RP, and STFT;
+- image size;
+- model architecture;
+- fusion type;
+- number of seeds;
+- optimizer, learning rate, scheduler, batch size, epochs, early stopping;
+- validation strategy;
+- hardware and runtime environment;
+- metrics and statistical tests;
+- exact Git commit hash;
+- `config_used.yaml` and `environment.json` for every reported run.
+
+For a stronger Q1/Q2 submission, include multi-dataset statistical testing, ablation analysis, complexity reporting, and interpretation of fusion weights.
+
+---
+
+## 16. Citation and academic use
+
+When using this repository in a thesis, report, or paper, describe clearly:
 
 ```text
-- nguồn dữ liệu;
-- số dataset;
-- số seed;
-- cấu hình transform GAF/MTF/RP/STFT;
-- kiến trúc mô hình;
-- baseline so sánh;
-- metric đánh giá;
-- kiểm định thống kê;
-- thông tin môi trường chạy.
+- data source and dataset list;
+- preprocessing and normalization;
+- time-series-to-image transformations;
+- CNN branch architecture;
+- adaptive gating / attention mechanism;
+- baselines;
+- metrics;
+- number of seeds;
+- statistical testing protocol;
+- hardware and software environment.
 ```
 
-Không nên công bố kết quả chỉ dựa trên một lần chạy đơn lẻ. Với bài báo chất lượng cao, nên dùng nhiều dataset, nhiều seed, baseline đầy đủ, kiểm định thống kê và phân tích ablation.
+This repository does not by itself prove that adaptive fusion is superior. Conclusions should be drawn only after controlled experiments with enough datasets, seeds, baselines, statistical tests, and ablation studies.
+
+---
+
+## 17. Disclaimer
+
+This repository is provided for **research, teaching, and experimental reproducibility**. The author does not guarantee that the code will run in every environment or reproduce identical results on every machine.
+
+Experimental results may vary due to Python/PyTorch/CUDA/cuDNN versions, library updates, CPU/GPU differences, random seeds, dataset formatting, Colab runtime changes, checkpoint behavior, and YAML configuration changes.
+
+Users are responsible for verifying data licenses, dataset correctness, environment setup, result validity, and manuscript claims before using this code for publication, teaching, reporting, or deployment.
+
+This is **not commercial software**, **not a production system**, and **not a guaranteed benchmark package**.
+
+---
+
+## 18. License note
+
+At the time of writing, this repository may not include an explicit `LICENSE` file. Add a clear open-source license before encouraging external reuse, redistribution, or derivative work.
