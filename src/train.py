@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import time
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict
 
 import numpy as np
 import pandas as pd
@@ -18,7 +18,12 @@ from src.evaluate import evaluate_model
 from src.models import AdaptiveFusionCNN, CNN1D
 from src.transforms.ts2image import build_or_load_2d_representations
 from src.utils.config import load_config, save_config
-from src.utils.experiment import collect_environment, make_run_name, normalize_representations
+from src.utils.experiment import (
+    collect_environment,
+    make_run_name,
+    normalize_representations,
+    validate_completed_summary,
+)
 from src.utils.metrics import (
     save_classification_report,
     save_confusion_matrix,
@@ -34,7 +39,18 @@ def get_device(device_cfg: str) -> torch.device:
     return torch.device(device_cfg)
 
 
-def save_checkpoint(path, epoch, model, optimizer, scheduler, best_val_f1, bad_epochs, history, cfg):
+def save_checkpoint(
+    path,
+    epoch,
+    model,
+    optimizer,
+    scheduler,
+    best_val_f1,
+    bad_epochs,
+    history,
+    cfg,
+    training_complete: bool = False,
+):
     torch.save(
         {
             "epoch": epoch,
@@ -45,6 +61,7 @@ def save_checkpoint(path, epoch, model, optimizer, scheduler, best_val_f1, bad_e
             "bad_epochs": bad_epochs,
             "history": history,
             "config": cfg,
+            "training_complete": bool(training_complete),
         },
         path,
     )
@@ -143,7 +160,13 @@ def build_model(cfg: Dict[str, Any], num_classes: int, num_representations: int)
     raise ValueError(f"Unsupported model.name: {name}")
 
 
-def compute_complexity(model: nn.Module, cfg: Dict[str, Any], device: torch.device, num_representations: int, raw_length: int | None):
+def compute_complexity(
+    model: nn.Module,
+    cfg: Dict[str, Any],
+    device: torch.device,
+    num_representations: int,
+    raw_length: int | None,
+):
     result = {"trainable_params": int(count_trainable_params(model)), "params": None, "flops": None}
     try:
         from thop import profile
@@ -159,12 +182,18 @@ def compute_complexity(model: nn.Module, cfg: Dict[str, Any], device: torch.devi
             dummy = torch.randn(1, num_representations, 1, image_size, image_size).to(device)
         flops, params = profile(model, inputs=(dummy,), verbose=False)
         result.update({"params": int(params), "flops": float(flops)})
-    except Exception as e:
-        result["error"] = str(e)
+    except Exception as exc:
+        result["error"] = str(exc)
     return result
 
 
-def benchmark_inference(model: nn.Module, loader: DataLoader, device: torch.device, repeats: int = 3, warmup_batches: int = 2):
+def benchmark_inference(
+    model: nn.Module,
+    loader: DataLoader,
+    device: torch.device,
+    repeats: int = 3,
+    warmup_batches: int = 2,
+):
     model.eval()
 
     def sync():
@@ -224,9 +253,25 @@ def main():
     parser = argparse.ArgumentParser(description="Train paper-grade time-series classification experiments.")
     parser.add_argument("--config", type=str, default="config/default.yaml")
     parser.add_argument("--no-resume", action="store_true", help="Ignore existing last checkpoint for this run.")
+    parser.add_argument(
+        "--force-rerun",
+        action="store_true",
+        help=(
+            "Ignore a valid completed summary and execute this run again. "
+            "Combine with --no-resume only for intentional retraining from epoch 1."
+        ),
+    )
     args = parser.parse_args()
 
     cfg = load_config(args.config)
+
+    complete, summary_path, reason = validate_completed_summary(cfg)
+    if complete and not args.force_rerun:
+        print(f"SKIP completed run: {summary_path.parent.name}")
+        print(f"Summary: {summary_path}")
+        return
+    if summary_path.exists() and not complete:
+        print(f"WARNING invalid summary, attempting checkpoint repair: {summary_path} ({reason})")
 
     seed = int(cfg["project"]["seed"])
     set_seed(seed)
@@ -237,7 +282,9 @@ def main():
 
     rep_names = []
     if input_mode != "raw_1d":
-        rep_names = normalize_representations(cfg["experiment"].get("representations", ["GAF", "MTF", "RP", "STFT"]))
+        rep_names = normalize_representations(
+            cfg["experiment"].get("representations", ["GAF", "MTF", "RP", "STFT"])
+        )
 
     data_root = Path(cfg["paths"]["data_root"])
     output_root = Path(cfg["paths"]["output_root"])
@@ -288,7 +335,11 @@ def main():
     device = get_device(cfg["training"].get("device", "auto"))
     print("Device:", device)
 
-    model = build_model(cfg, num_classes=num_classes, num_representations=max(1, num_representations)).to(device)
+    model = build_model(
+        cfg,
+        num_classes=num_classes,
+        num_representations=max(1, num_representations),
+    ).to(device)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.AdamW(
@@ -312,6 +363,7 @@ def main():
     best_val_f1 = -1.0
     bad_epochs = 0
     history = []
+    training_complete = False
 
     resume_enabled = bool(checkpoint_cfg.get("resume", True)) and not args.no_resume
     if resume_enabled and last_ckpt.exists():
@@ -324,75 +376,102 @@ def main():
         best_val_f1 = float(ckpt.get("best_val_f1", -1.0))
         bad_epochs = int(ckpt.get("bad_epochs", 0))
         history = ckpt.get("history", [])
+        training_complete = bool(ckpt.get("training_complete", False))
         print(f"Start epoch: {start_epoch}, best val Macro-F1: {best_val_f1:.4f}")
+        if training_complete:
+            print("Checkpoint marks training as complete; skipping the training loop.")
 
     epochs = int(cfg["training"].get("epochs", 100))
     patience = int(cfg["training"].get("patience", 20))
 
-    for epoch in range(start_epoch, epochs + 1):
-        model.train()
-        epoch_loss = 0.0
-        n_samples = 0
-        t0 = time.time()
+    if not training_complete:
+        for epoch in range(start_epoch, epochs + 1):
+            model.train()
+            epoch_loss = 0.0
+            n_samples = 0
+            t0 = time.time()
 
-        for xb, yb in train_loader:
-            xb = xb.to(device, non_blocking=True)
-            yb = yb.to(device, non_blocking=True)
+            for xb, yb in train_loader:
+                xb = xb.to(device, non_blocking=True)
+                yb = yb.to(device, non_blocking=True)
 
-            optimizer.zero_grad()
-            logits, _ = model(xb)
-            loss = criterion(logits, yb)
-            loss.backward()
-            optimizer.step()
+                optimizer.zero_grad()
+                logits, _ = model(xb)
+                loss = criterion(logits, yb)
+                loss.backward()
+                optimizer.step()
 
-            epoch_loss += loss.item() * yb.size(0)
-            n_samples += yb.size(0)
+                epoch_loss += loss.item() * yb.size(0)
+                n_samples += yb.size(0)
 
-        train_loss = epoch_loss / max(n_samples, 1)
-        train_metrics = evaluate_model(model, train_loader, device, criterion)
-        val_metrics = evaluate_model(model, val_loader, device, criterion)
-        scheduler.step(val_metrics["macro_f1"])
+            train_loss = epoch_loss / max(n_samples, 1)
+            train_metrics = evaluate_model(model, train_loader, device, criterion)
+            val_metrics = evaluate_model(model, val_loader, device, criterion)
+            scheduler.step(val_metrics["macro_f1"])
 
-        elapsed = time.time() - t0
+            elapsed = time.time() - t0
 
-        row = {
-            "epoch": epoch,
-            "train_loss": train_loss,
-            "train_acc": train_metrics["acc"],
-            "train_macro_f1": train_metrics["macro_f1"],
-            "val_loss": val_metrics["loss"],
-            "val_acc": val_metrics["acc"],
-            "val_macro_f1": val_metrics["macro_f1"],
-            "val_precision": val_metrics["precision"],
-            "val_recall": val_metrics["recall"],
-            "lr": optimizer.param_groups[0]["lr"],
-            "time_sec": elapsed,
-        }
-        history.append(row)
-        pd.DataFrame(history).to_csv(history_csv, index=False)
+            row = {
+                "epoch": epoch,
+                "train_loss": train_loss,
+                "train_acc": train_metrics["acc"],
+                "train_macro_f1": train_metrics["macro_f1"],
+                "val_loss": val_metrics["loss"],
+                "val_acc": val_metrics["acc"],
+                "val_macro_f1": val_metrics["macro_f1"],
+                "val_precision": val_metrics["precision"],
+                "val_recall": val_metrics["recall"],
+                "lr": optimizer.param_groups[0]["lr"],
+                "time_sec": elapsed,
+            }
+            history.append(row)
+            pd.DataFrame(history).to_csv(history_csv, index=False)
 
-        print(
-            f"Epoch {epoch:03d} | "
-            f"train_loss={train_loss:.4f} | "
-            f"train_f1={train_metrics['macro_f1']:.4f} | "
-            f"val_f1={val_metrics['macro_f1']:.4f} | "
-            f"val_acc={val_metrics['acc']:.4f} | "
-            f"time={elapsed:.1f}s"
-        )
+            print(
+                f"Epoch {epoch:03d} | "
+                f"train_loss={train_loss:.4f} | "
+                f"train_f1={train_metrics['macro_f1']:.4f} | "
+                f"val_f1={val_metrics['macro_f1']:.4f} | "
+                f"val_acc={val_metrics['acc']:.4f} | "
+                f"time={elapsed:.1f}s"
+            )
 
-        save_checkpoint(last_ckpt, epoch, model, optimizer, scheduler, best_val_f1, bad_epochs, history, cfg)
+            if val_metrics["macro_f1"] > best_val_f1:
+                best_val_f1 = val_metrics["macro_f1"]
+                bad_epochs = 0
+                save_checkpoint(
+                    best_ckpt,
+                    epoch,
+                    model,
+                    optimizer,
+                    scheduler,
+                    best_val_f1,
+                    bad_epochs,
+                    history,
+                    cfg,
+                    training_complete=False,
+                )
+                print("Saved best model.")
+            else:
+                bad_epochs += 1
 
-        if val_metrics["macro_f1"] > best_val_f1:
-            best_val_f1 = val_metrics["macro_f1"]
-            bad_epochs = 0
-            save_checkpoint(best_ckpt, epoch, model, optimizer, scheduler, best_val_f1, bad_epochs, history, cfg)
-            print("Saved best model.")
-        else:
-            bad_epochs += 1
+            training_complete = bad_epochs >= patience or epoch >= epochs
+            save_checkpoint(
+                last_ckpt,
+                epoch,
+                model,
+                optimizer,
+                scheduler,
+                best_val_f1,
+                bad_epochs,
+                history,
+                cfg,
+                training_complete=training_complete,
+            )
 
-        if bad_epochs >= patience:
-            print("Early stopping.")
-            break
+            if bad_epochs >= patience:
+                print("Early stopping.")
+                break
 
     if not best_ckpt.exists():
         raise FileNotFoundError(f"Best checkpoint was not created: {best_ckpt}")
@@ -402,7 +481,13 @@ def main():
     model.load_state_dict(ckpt["model_state"])
     test_metrics = evaluate_model(model, test_loader, device, criterion)
 
-    complexity = compute_complexity(model, cfg, device, num_representations=max(1, num_representations), raw_length=raw_length)
+    complexity = compute_complexity(
+        model,
+        cfg,
+        device,
+        num_representations=max(1, num_representations),
+        raw_length=raw_length,
+    )
     save_json(complexity, run_dir / "complexity.json")
 
     benchmark_cfg = cfg.get("evaluation", {})
@@ -440,7 +525,7 @@ def main():
         "params": complexity.get("params"),
         "flops": complexity.get("flops"),
         "inference_ms_per_sample": None if inference is None else inference["ms_per_sample"],
-        "total_train_time_sec": float(sum(float(r.get("time_sec", 0.0)) for r in history)),
+        "total_train_time_sec": float(sum(float(row.get("time_sec", 0.0)) for row in history)),
     }
 
     alpha_mean = save_alpha_outputs(cfg, test_metrics, rep_names, run_dir)
