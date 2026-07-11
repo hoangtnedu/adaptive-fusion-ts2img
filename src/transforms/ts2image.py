@@ -48,14 +48,39 @@ def make_gaf(
     method: str = "summation",
     sample_range=(-1, 1),
 ) -> np.ndarray:
+    """Create GAF images safely for both short and long time series.
+
+    pyts requires an integer image_size to be less than or equal to the number of
+    timestamps. For short series, GAF is therefore created at the native temporal
+    resolution and then resized to the configured output size.
+    """
     from pyts.image import GramianAngularField
+    from skimage.transform import resize
+
+    target_size = int(image_size)
+    native_size = min(target_size, int(X.shape[1]))
 
     transformer = GramianAngularField(
-        image_size=image_size,
+        image_size=native_size,
         method=method,
         sample_range=tuple(sample_range) if sample_range is not None else None,
     )
     images = transformer.fit_transform(X)
+
+    if native_size != target_size:
+        images = np.stack(
+            [
+                resize(
+                    img,
+                    (target_size, target_size),
+                    anti_aliasing=True,
+                    preserve_range=True,
+                ).astype(np.float32)
+                for img in images
+            ],
+            axis=0,
+        )
+
     return minmax_per_image(images)
 
 
@@ -65,14 +90,39 @@ def make_mtf(
     n_bins: int = 8,
     strategy: str = "quantile",
 ) -> np.ndarray:
+    """Create MTF images safely for both short and long time series.
+
+    pyts requires an integer image_size to be less than or equal to the number of
+    timestamps. For short series, MTF is created at the native temporal resolution
+    and then resized to the configured output size.
+    """
     from pyts.image import MarkovTransitionField
+    from skimage.transform import resize
+
+    target_size = int(image_size)
+    native_size = min(target_size, int(X.shape[1]))
 
     transformer = MarkovTransitionField(
-        image_size=image_size,
+        image_size=native_size,
         n_bins=n_bins,
         strategy=strategy,
     )
     images = transformer.fit_transform(X)
+
+    if native_size != target_size:
+        images = np.stack(
+            [
+                resize(
+                    img,
+                    (target_size, target_size),
+                    anti_aliasing=True,
+                    preserve_range=True,
+                ).astype(np.float32)
+                for img in images
+            ],
+            axis=0,
+        )
+
     return minmax_per_image(images)
 
 
